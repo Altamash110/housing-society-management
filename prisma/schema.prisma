@@ -1,0 +1,219 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Society {
+  id               Int     @id @default(autoincrement())
+  name             String
+  address          String
+  contactInfo      String
+  registrationNumber String @unique
+  flats            Flat[]
+  users            User[]
+  staff            Staff[]
+  parkingSlots     ParkingSlot[]
+}
+
+model User {
+  id         Int    @id @default(autoincrement())
+  name       String
+  email      String @unique
+  phone      String
+  role       String
+  password   String
+  societyId  Int    
+  society    Society @relation(fields: [societyId], references: [id])
+  flats      Flat[]  
+  vehicles   Vehicle[] 
+  visitors   Visitor[] 
+
+  resident   Resident?
+  admin      Admin?
+  committee  CommitteeMember?
+  security   SecurityGuard?
+}
+
+model Resident {
+  id                Int                @id @default(autoincrement())
+  userId            Int                @unique
+  user              User               @relation(fields: [userId], references: [id])
+  flatId            Int                @unique
+  flat              Flat               @relation(fields: [flatId], references: [id])
+  complaints        Complaint[]
+  maintenanceBills  MaintenanceBill[]
+  serviceRequests   ServiceRequest[]
+  emergencyAlerts   EmergencyAlert[]   
+}
+
+model Flat {
+  id         Int    @id @default(autoincrement())
+  societyId  Int    
+  society    Society @relation(fields: [societyId], references: [id])
+  flatNumber String
+  type       String
+  ownerId    Int    
+  owner      User   @relation(fields: [ownerId], references: [id])
+  resident   Resident?
+  maintenanceBills MaintenanceBill[]
+  parkingSlots ParkingSlot[]
+}
+model Admin {
+  id       Int  @id @default(autoincrement())
+  userId   Int  @unique
+  user     User @relation(fields: [userId], references: [id])
+  societyRules SocietyRule[]
+  documents SocietyDocument[]
+}
+
+model CommitteeMember {
+  id        Int  @id @default(autoincrement())
+  userId    Int  @unique
+  user      User @relation(fields: [userId], references: [id])
+  position  String
+  events    Event[]
+  votingPolls  VotingPoll[]
+}
+
+model SecurityGuard {
+  id         Int  @id @default(autoincrement())
+  userId     Int  @unique
+  user       User @relation(fields: [userId], references: [id])
+  shiftTimings String
+  emergencyAlerts EmergencyAlert[]
+}
+
+model Staff {
+  id          Int    @id @default(autoincrement())
+  name        String
+  role        String
+  contactInfo String
+  societyId   Int    
+  society     Society @relation(fields: [societyId], references: [id])
+  assignedComplaints Complaint[]
+  assignedRequests ServiceRequest[]
+}
+
+model MaintenanceBill {
+  id         Int    @id @default(autoincrement())
+  residentId Int    
+  resident   Resident @relation(fields: [residentId], references: [id])
+  flatId     Int    
+  flat       Flat @relation(fields: [flatId], references: [id])
+  amount     Float
+  dueDate    DateTime
+  status     String
+  paymentMethod String
+}
+
+model Visitor {
+  id          Int    @id @default(autoincrement())
+  name        String
+  contactInfo String
+  purpose     String
+  entryTime   DateTime
+  exitTime    DateTime?
+  approvedBy  Int    
+  approvedByUser User @relation(fields: [approvedBy], references: [id])
+}
+
+model Complaint {
+  id          Int    @id @default(autoincrement())
+  residentId  Int    
+  resident    Resident @relation(fields: [residentId], references: [id])
+  category    String
+  description String
+  status      String
+  assignedTo  Int?   
+  assignedStaff Staff? @relation(fields: [assignedTo], references: [id])
+}
+
+model Event {
+  id           Int    @id @default(autoincrement())
+  title        String
+  description  String
+  date         DateTime
+  organizedBy  Int
+  committee    CommitteeMember @relation(fields: [organizedBy], references: [id])
+}
+
+model SocietyRule {
+  id          Int    @id @default(autoincrement())
+  title       String
+  description String
+  enforcedBy  Int    
+  admin       Admin @relation(fields: [enforcedBy], references: [id])
+}
+
+model ParkingSlot {
+  id          Int    @id @default(autoincrement())
+  societyId   Int    
+  society     Society @relation(fields: [societyId], references: [id])
+  flatId      Int?
+  flat        Flat? @relation(fields: [flatId], references: [id]) 
+  slotNumber  String
+  vehicleNumber String
+}
+
+model Vehicle {
+  id          Int    @id @default(autoincrement())
+  ownerId     Int    
+  owner       User @relation(fields: [ownerId], references: [id])
+  vehicleNumber String
+  type        String
+}
+
+model ServiceRequest {
+  id              Int     @id @default(autoincrement())
+  residentId      Int     
+  resident        Resident @relation(fields: [residentId], references: [id])
+  type            String
+  description     String
+  status          String
+  assignedStaffId Int?  
+  assignedStaff   Staff?  @relation(fields: [assignedStaffId], references: [id])
+}
+
+model EmergencyAlert {
+  id          Int    @id @default(autoincrement())
+  raisedBy    Int
+  resident    Resident @relation(fields: [raisedBy], references: [id])
+  alertType   String
+  alertTime   DateTime
+  resolvedBy  Int?
+  security    SecurityGuard? @relation(fields: [resolvedBy], references: [id])
+  status      String
+}
+
+model VotingPoll {
+  id         Int    @id @default(autoincrement())
+  createdBy  Int    
+  committee  CommitteeMember @relation(fields: [createdBy], references: [id])
+  question   String
+  options    String
+  startDate  DateTime
+  endDate    DateTime
+  status     String
+}
+
+model SocietyDocument {
+  id           Int    @id @default(autoincrement())
+  title        String
+  description  String
+  uploadedBy   Int    
+  admin        Admin @relation(fields: [uploadedBy], references: [id])
+  uploadDate   DateTime
+  fileLocation String
+}
+
+
+
