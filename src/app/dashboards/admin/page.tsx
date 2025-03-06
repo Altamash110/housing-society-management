@@ -4,7 +4,7 @@ import Head from 'next/head';
 
 // Optionally, if you have a dedicated dashboard layout,
 // you can import it. Otherwise, use your global layout.
-import DashboardLayout from '../components/DashboardLayout';
+import DashboardLayout from '../../components/DashboardLayout';
 
 const residents = [
   { id: 1, name: 'John Doe', flat: 'A-101', billStatus: 'Paid' },

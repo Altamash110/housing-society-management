@@ -1,5 +1,5 @@
 import React from 'react';
-import DashboardLayout from '../components/DashboardLayout';
+import DashboardLayout from '../../components/DashboardLayout';
 
 const notices = [
   { id: 1, title: 'Annual Meeting', date: '2025-04-10', status: 'Upcoming' },
