@@ -29,8 +29,8 @@ model User {
   name       String
   email      String @unique
   phone      String
-  role       String
-  password   String
+  role       String  // e.g., "admin", "resident", "tenant", "security"
+  password   String  // MUST be hashed before storing
   societyId  Int    
   society    Society @relation(fields: [societyId], references: [id])
   flats      Flat[]  
@@ -41,7 +41,11 @@ model User {
   admin      Admin?
   committee  CommitteeMember?
   security   SecurityGuard?
+
+  createdAt  DateTime @default(now())   // Track when user was created
+  updatedAt  DateTime @updatedAt        // Auto-update when user updates info
 }
+
 
 model Resident {
   id                Int                @id @default(autoincrement())
