@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,72 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Society {
-  id               Int     @id @default(autoincrement())
-  name             String
-  address          String
-  contactInfo      String
-  registrationNumber String @unique
-  flats            Flat[]
-  users            User[]
-  staff            Staff[]
-  parkingSlots     ParkingSlot[]
-}
-
-model User {
-  id         Int    @id @default(autoincrement())
-  name       String
-  email      String @unique
-  phone      String
-  role       String  // e.g., "admin", "resident", "tenant", "security"
-  password   String  // MUST be hashed before storing
-  societyId  Int    
-  society    Society @relation(fields: [societyId], references: [id])
-  flats      Flat[]  
-  vehicles   Vehicle[] 
-  visitors   Visitor[] 
-
-  resident   Resident?
-  admin      Admin?
-  committee  CommitteeMember?
-  security   SecurityGuard?
-
-  createdAt  DateTime @default(now())   // Track when user was created
-  updatedAt  DateTime @updatedAt        // Auto-update when user updates info
-}
-
-
-model Resident {
-  id                Int                @id @default(autoincrement())
-  userId            Int                @unique
-  user              User               @relation(fields: [userId], references: [id])
-  flatId            Int                @unique
-  flat              Flat               @relation(fields: [flatId], references: [id])
-  complaints        Complaint[]
-  maintenanceBills  MaintenanceBill[]
-  serviceRequests   ServiceRequest[]
-  emergencyAlerts   EmergencyAlert[]   
-}
-
-model Flat {
-  id         Int    @id @default(autoincrement())
-  societyId  Int    
-  society    Society @relation(fields: [societyId], references: [id])
-  flatNumber String
-  type       String
-  ownerId    Int    
-  owner      User   @relation(fields: [ownerId], references: [id])
-  resident   Resident?
-  maintenanceBills MaintenanceBill[]
-  parkingSlots ParkingSlot[]
-}
 model Admin {
-  id       Int  @id @default(autoincrement())
-  userId   Int  @unique
-  user     User @relation(fields: [userId], references: [id])
-  societyRules SocietyRule[]
-  documents SocietyDocument[]
+  id              Int               @id @default(autoincrement())
+  userId          Int               @unique(map: "Admin_userId_key")
+  user            User              @relation(fields: [userId], references: [id], map: "Admin_userId_fkey") // ✅ Fixed casing
+  societyDocument SocietyDocument[] // ✅ Fixed casing and PascalCase
+  societyRule     SocietyRule[]     // ✅ Fixed casing and PascalCase
 }
+
 
 model CommitteeMember {
   id        Int  @id @default(autoincrement())
@@ -85,8 +22,108 @@ model CommitteeMember {
   user      User @relation(fields: [userId], references: [id])
   position  String
   events    Event[]
-  votingPolls  VotingPoll[]
+  votingPolls VotingPoll[]
 }
+
+
+model Complaint {
+  id          Int      @id @default(autoincrement())
+  residentId  Int
+  category    String
+  description String
+  status      String
+  assignedTo  Int?
+  staff       Staff?   @relation(fields: [assignedTo], references: [id], map: "Complaint_assignedTo_fkey")
+  resident    Resident @relation(fields: [residentId], references: [id], map: "Complaint_residentId_fkey")
+
+  @@index([assignedTo], map: "Complaint_assignedTo_fkey")
+  @@index([residentId], map: "Complaint_residentId_fkey")
+}
+
+model EmergencyAlert {
+  id            Int            @id @default(autoincrement())
+  raisedBy      Int
+  alertType     String
+  alertTime     DateTime
+  resolvedBy    Int?
+  status        String
+  resident      Resident       @relation(fields: [raisedBy], references: [id], map: "EmergencyAlert_raisedBy_fkey")
+  securityguard SecurityGuard? @relation(fields: [resolvedBy], references: [id], map: "EmergencyAlert_resolvedBy_fkey")
+
+  @@index([raisedBy], map: "EmergencyAlert_raisedBy_fkey")
+  @@index([resolvedBy], map: "EmergencyAlert_resolvedBy_fkey")
+}
+
+model Event {
+  id              Int             @id @default(autoincrement())
+  title           String
+  description     String
+  date            DateTime
+  organizedBy     Int
+  committeemember CommitteeMember @relation(fields: [organizedBy], references: [id], map: "Event_organizedBy_fkey")
+
+  @@index([organizedBy], map: "Event_organizedBy_fkey")
+}
+
+model Flat {
+  id              Int               @id @default(autoincrement())
+  societyId       Int
+  flatNumber      String
+  type            String
+  ownerId         Int
+  user            User              @relation(fields: [ownerId], references: [id], map: "Flat_ownerId_fkey")
+  society         Society           @relation(fields: [societyId], references: [id], map: "Flat_societyId_fkey")
+  maintenancebill MaintenanceBill[]
+  parkingslot     ParkingSlot[]
+  resident        Resident?
+
+  @@index([ownerId], map: "Flat_ownerId_fkey")
+  @@index([societyId], map: "Flat_societyId_fkey")
+}
+
+model MaintenanceBill {
+  id            Int      @id @default(autoincrement())
+  residentId    Int
+  flatId        Int
+  amount        Float
+  dueDate       DateTime
+  status        String
+  paymentMethod String
+  flat          Flat     @relation(fields: [flatId], references: [id], map: "MaintenanceBill_flatId_fkey")
+  resident      Resident @relation(fields: [residentId], references: [id], map: "MaintenanceBill_residentId_fkey")
+
+  @@index([flatId], map: "MaintenanceBill_flatId_fkey")
+  @@index([residentId], map: "MaintenanceBill_residentId_fkey")
+}
+
+model ParkingSlot {
+  id            Int     @id @default(autoincrement())
+  societyId     Int
+  flatId        Int?
+  slotNumber    String
+  vehicleNumber String
+  flat          Flat?   @relation(fields: [flatId], references: [id], map: "ParkingSlot_flatId_fkey")
+  society       Society @relation(fields: [societyId], references: [id], map: "ParkingSlot_societyId_fkey")
+
+  @@index([flatId], map: "ParkingSlot_flatId_fkey")
+  @@index([societyId], map: "ParkingSlot_societyId_fkey")
+}
+
+model Resident {
+  id              Int               @id @default(autoincrement())
+  userId          Int               @unique(map: "Resident_userId_key")
+  flatId          Int               @unique(map: "Resident_flatId_key")
+
+  complaint       Complaint[]
+  emergencyAlert  EmergencyAlert[]
+  maintenanceBill MaintenanceBill[]
+  
+  flat            Flat              @relation(fields: [flatId], references: [id], map: "Resident_flatId_fkey")
+  user            User              @relation(fields: [userId], references: [id], map: "Resident_userId_fkey")
+  
+  serviceRequest  ServiceRequest[]
+}
+
 
 model SecurityGuard {
   id         Int  @id @default(autoincrement())
@@ -96,28 +133,101 @@ model SecurityGuard {
   emergencyAlerts EmergencyAlert[]
 }
 
-model Staff {
-  id          Int    @id @default(autoincrement())
-  name        String
-  role        String
-  contactInfo String
-  societyId   Int    
-  society     Society @relation(fields: [societyId], references: [id])
-  assignedComplaints Complaint[]
-  assignedRequests ServiceRequest[]
+
+model ServiceRequest {
+  id              Int      @id @default(autoincrement())
+  residentId      Int
+  type            String
+  description     String
+  status          String
+  assignedStaffId Int?
+  staff           Staff?   @relation(fields: [assignedStaffId], references: [id], map: "ServiceRequest_assignedStaffId_fkey")
+  resident        Resident @relation(fields: [residentId], references: [id], map: "ServiceRequest_residentId_fkey")
+
+  @@index([assignedStaffId], map: "ServiceRequest_assignedStaffId_fkey")
+  @@index([residentId], map: "ServiceRequest_residentId_fkey")
 }
 
-model MaintenanceBill {
-  id         Int    @id @default(autoincrement())
-  residentId Int    
-  resident   Resident @relation(fields: [residentId], references: [id])
-  flatId     Int    
-  flat       Flat @relation(fields: [flatId], references: [id])
-  amount     Float
-  dueDate    DateTime
-  status     String
-  paymentMethod String
+model Society {
+  id               Int     @id @default(autoincrement())
+  name             String  @unique  // ✅ Added @unique here
+  address          String
+  contactInfo      String
+  registrationNumber String @unique
+  flats            Flat[]
+  users            User[]
+  staff            Staff[]
+  parkingSlots     ParkingSlot[]
 }
+
+
+model SocietyDocument {
+  id           Int      @id @default(autoincrement())
+  title        String
+  description  String
+  uploadedBy   Int
+  uploadDate   DateTime
+  fileLocation String
+  admin        Admin    @relation(fields: [uploadedBy], references: [id], map: "SocietyDocument_uploadedBy_fkey")
+
+  @@index([uploadedBy], map: "SocietyDocument_uploadedBy_fkey")
+}
+
+model SocietyRule {
+  id          Int    @id @default(autoincrement())
+  title       String
+  description String
+  enforcedBy  Int
+  admin       Admin  @relation(fields: [enforcedBy], references: [id], map: "SocietyRule_enforcedBy_fkey")
+
+  @@index([enforcedBy], map: "SocietyRule_enforcedBy_fkey")
+}
+
+model Staff {
+  id             Int              @id @default(autoincrement())
+  name           String
+  role           String
+  contactInfo    String
+  societyId      Int
+  complaint      Complaint[]
+  servicerequest ServiceRequest[]
+  society        Society          @relation(fields: [societyId], references: [id], map: "Staff_societyId_fkey")
+
+  @@index([societyId], map: "Staff_societyId_fkey")
+}
+
+model User {
+  id         Int     @id @default(autoincrement())
+  name       String
+  email      String  @unique
+  phone      String
+  role       String  
+  password   String  
+  societyId  Int?   
+  society    Society?          @relation(fields: [societyId], references: [id], map: "User_societyId_fkey") // ✅ Made it optional
+  flats      Flat[]  
+  vehicles   Vehicle[] 
+  visitors   Visitor[] 
+
+  resident   Resident?
+  admin      Admin?
+  committee  CommitteeMember?
+  security   SecurityGuard?
+
+  createdAt  DateTime @default(now())   
+  updatedAt  DateTime @updatedAt        
+}
+
+
+model Vehicle {
+  id            Int     @id @default(autoincrement())
+  ownerId       Int
+  user          User    @relation(fields: [ownerId], references: [id], map: "Vehicle_ownerId_fkey") // ✅ Fixed casing
+  vehicleNumber String
+  type          String
+}
+
+
 
 model Visitor {
   id          Int    @id @default(autoincrement())
@@ -127,97 +237,20 @@ model Visitor {
   entryTime   DateTime
   exitTime    DateTime?
   approvedBy  Int    
-  approvedByUser User @relation(fields: [approvedBy], references: [id])
+  user        User      @relation(fields: [approvedBy], references: [id], map: "Visitor_approvedBy_fkey") // ✅ Correct case
 }
 
-model Complaint {
-  id          Int    @id @default(autoincrement())
-  residentId  Int    
-  resident    Resident @relation(fields: [residentId], references: [id])
-  category    String
-  description String
-  status      String
-  assignedTo  Int?   
-  assignedStaff Staff? @relation(fields: [assignedTo], references: [id])
-}
-
-model Event {
-  id           Int    @id @default(autoincrement())
-  title        String
-  description  String
-  date         DateTime
-  organizedBy  Int
-  committee    CommitteeMember @relation(fields: [organizedBy], references: [id])
-}
-
-model SocietyRule {
-  id          Int    @id @default(autoincrement())
-  title       String
-  description String
-  enforcedBy  Int    
-  admin       Admin @relation(fields: [enforcedBy], references: [id])
-}
-
-model ParkingSlot {
-  id          Int    @id @default(autoincrement())
-  societyId   Int    
-  society     Society @relation(fields: [societyId], references: [id])
-  flatId      Int?
-  flat        Flat? @relation(fields: [flatId], references: [id]) 
-  slotNumber  String
-  vehicleNumber String
-}
-
-model Vehicle {
-  id          Int    @id @default(autoincrement())
-  ownerId     Int    
-  owner       User @relation(fields: [ownerId], references: [id])
-  vehicleNumber String
-  type        String
-}
-
-model ServiceRequest {
-  id              Int     @id @default(autoincrement())
-  residentId      Int     
-  resident        Resident @relation(fields: [residentId], references: [id])
-  type            String
-  description     String
-  status          String
-  assignedStaffId Int?  
-  assignedStaff   Staff?  @relation(fields: [assignedStaffId], references: [id])
-}
-
-model EmergencyAlert {
-  id          Int    @id @default(autoincrement())
-  raisedBy    Int
-  resident    Resident @relation(fields: [raisedBy], references: [id])
-  alertType   String
-  alertTime   DateTime
-  resolvedBy  Int?
-  security    SecurityGuard? @relation(fields: [resolvedBy], references: [id])
-  status      String
-}
 
 model VotingPoll {
-  id         Int    @id @default(autoincrement())
-  createdBy  Int    
-  committee  CommitteeMember @relation(fields: [createdBy], references: [id])
-  question   String
-  options    String
-  startDate  DateTime
-  endDate    DateTime
-  status     String
+  id              Int             @id @default(autoincrement())
+  createdBy       Int
+  question        String
+  options         String
+  startDate       DateTime
+  endDate         DateTime
+  status          String
+  committee       CommitteeMember @relation(fields: [createdBy], references: [id], map: "VotingPoll_createdBy_fkey") // ✅ Fixed casing and reference
+
+  @@index([createdBy], map: "VotingPoll_createdBy_fkey")
 }
-
-model SocietyDocument {
-  id           Int    @id @default(autoincrement())
-  title        String
-  description  String
-  uploadedBy   Int    
-  admin        Admin @relation(fields: [uploadedBy], references: [id])
-  uploadDate   DateTime
-  fileLocation String
-}
-
-
 

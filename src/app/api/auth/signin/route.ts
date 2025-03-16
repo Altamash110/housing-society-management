@@ -1,50 +1,74 @@
-import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcrypt";
-import { sign } from "jsonwebtoken";
+import bcrypt from 'bcrypt';
+import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
 
 const prisma = new PrismaClient();
-const SECRET_KEY = process.env.SECRET_KEY || "your_secret_key"; 
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json();
 
-    // Check if user exists
-    const user = await prisma.user.findUnique({ where: { email } });
+    // ✅ Step 1: Find the user
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    console.log('Retrieved user:', user); // ✅ Debug output
+
     if (!user) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Invalid email or password (User not found)' },
+        { status: 401 }
+      );
     }
 
-    // Verify password
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+    // ✅ Step 2: Compare the hashed password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    console.log('isPasswordValid:', isPasswordValid); // ✅ Debug output
+
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { error: 'Invalid email or password (Password mismatch)' },
+        { status: 401 }
+      );
     }
 
-    // Generate JWT Token
-    const token = sign({ userId: user.id, role: user.role }, SECRET_KEY, { expiresIn: "1h" });
+    // ✅ Step 3: Redirect based on role
+    let redirectUrl = '/';
+    switch (user.role) {
+      case 'admin':
+        redirectUrl = '/dashboard/admin';
+        break;
+      case 'resident':
+        redirectUrl = '/dashboard/resident';
+        break;
+      case 'tenant':
+        redirectUrl = '/dashboard/tenant';
+        break;
+      case 'security':
+        redirectUrl = '/dashboard/security';
+        break;
+      case 'committee':
+        redirectUrl = '/dashboard/committee';
+        break;
+      default:
+        redirectUrl = '/';
+    }
 
-    // Role-based Dashboard Route
-    const dashboardRoutes: Record<string, string> = {
-      admin: "/dashboard/admin",
-      resident: "/dashboard/resident",
-      tenant: "/dashboard/tenant",
-      security: "/dashboard/security",
-    };
-    const dashboardRoute = dashboardRoutes[user.role] || "/dashboard";
-
-    console.log("Returning redirect:", dashboardRoute); // ✅ Debugging log
-
-    // Set Cookie for Authentication
-    const response = NextResponse.json(
-      { message: "Login successful", redirect: dashboardRoute },
+    return NextResponse.json(
+      {
+        message: 'User logged in successfully',
+        user,
+        redirectUrl,
+      },
       { status: 200 }
     );
-    response.cookies.set("token", token, { httpOnly: true });
-
-    return response;
   } catch (error) {
-    return NextResponse.json({ error: "Error logging in" }, { status: 500 });
+    console.error('Sign-in error:', error);
+    return NextResponse.json(
+      { error: 'Error signing in' },
+      { status: 500 }
+    );
   }
 }
